@@ -5,10 +5,18 @@ from .routers import critters
 from .routers import socket_ops
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 APP_MODE = os.getenv("APP_MODE")
+print('================================')
+print(APP_MODE)
+print('================================')
 docs_url = None if APP_MODE == "production" else "/docs"
 redoc_url = None if APP_MODE == "production" else "/redoc"
 openapi_url = None if APP_MODE == "production" else "/openapi.json"
+
 
 app = FastAPI(docs_url=docs_url, redoc_url=redoc_url, openapi_url=openapi_url)
 

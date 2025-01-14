@@ -1,0 +1,12 @@
+[Unit]
+Description=Uvicorn service for batcave-api
+After=network.target
+
+[Service]
+User=www-data
+Group=batman
+WorkingDirectory=/srv/batcave-api
+ExecStart=/srv/batcave-api/batvenv/bin/fastapi run
+
+[Install]
+WantedBy=multi-user.target
