@@ -4,31 +4,61 @@ from starlette.middleware.cors import CORSMiddleware
 from .routers import critters
 from .routers import socket_ops
 import os
+import secure
+from .config import settings
 
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
+#
+# load_dotenv()
 
-load_dotenv()
-
-APP_MODE = os.getenv("APP_MODE")
+# APP_MODE = os.getenv("APP_MODE")
 print('================================')
-print(APP_MODE)
+# print(APP_MODE)
+print(settings.app_mode)
 print('================================')
-docs_url = None if APP_MODE == "production" else "/docs"
-redoc_url = None if APP_MODE == "production" else "/redoc"
-openapi_url = None if APP_MODE == "production" else "/openapi.json"
+docs_url = None if settings.app_mode == "production" else "/docs"
+redoc_url = None if settings.app_mode == "production" else "/redoc"
+openapi_url = None if settings.app_mode == "production" else "/openapi.json"
 
 
 app = FastAPI(docs_url=docs_url, redoc_url=redoc_url, openapi_url=openapi_url)
 
+csp = secure.ContentSecurityPolicy().default_src("'self'").frame_ancestors("'none'")
+# enforces https - should be skipped / handled by reverse proxy if using?
+# hsts = secure.StrictTransportSecurity().max_age(31536000).include_subdomains()
+# we want referrer info
+# referrer = secure.ReferrerPolicy().no_referrer()
+cache_value = secure.CacheControl().no_cache().no_store().max_age(0).must_revalidate()
+x_frame_options = secure.XFrameOptions().deny()
+
+# secure_headers = secure.Secure(
+#     csp=csp,
+#     hsts=hsts,
+#     referrer=referrer,
+#     cache=cache_value,
+#     xfo=x_frame_options,
+# )
+secure_headers = secure.Secure.with_default_headers()
+
+@app.middleware("http")
+async def add_secure_headers(request, call_next):
+    response = await call_next(request)
+    await secure_headers.set_headers_async(response)
+    return response
+
+# can we get an array from settings.client_origin_url?
 origins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173'
+    'https://192.168.1.251:443'
 ]
 
 app.add_middleware(CORSMiddleware,
                    allow_origins=origins,
                    allow_methods=["*"],
-                   allow_headers=["*"],)
+                   allow_headers=["*"],
+                   max_age=86400,
+                   )
 
 app.include_router(critters.router)
 app.include_router(socket_ops.router)
@@ -79,15 +109,3 @@ html = """
 @app.get("/whatever")
 async def get_whatever():
     return HTMLResponse(html)
-
-# @app.websocket("/ws/{client_id}")
-# async def websocket_endpoint(websocket: WebSocket, client_id: str):
-#     await manager.connect(websocket)
-#     try:
-#         while True:
-#             data = await websocket.receive_text()
-#             await manager.handle_message(websocket, data, client_id)
-#     except WebSocketDisconnect:
-#         manager.disconnect(websocket)
-#         await manager.broadcast(f"Client #{client_id} left the chat")
-

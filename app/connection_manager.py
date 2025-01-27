@@ -1,6 +1,7 @@
 from fastapi import WebSocket
 #import RPi.GPIO as GPIO
 import time
+from datetime import datetime
 
 class ConnectionManager:
     def __init__(self):
@@ -17,7 +18,8 @@ class ConnectionManager:
         if message == 'POW':
             self.trigger_door()
             await websocket.send_text('You have triggered the batcave')
-            announcement = f"{client_id} has triggered the batcave"
+            now = datetime.now()
+            announcement = f"{client_id} triggered batcave @ {now.strftime('%H:%M:%S')}"
             await self.broadcast(announcement)
         else:
             await websocket.send_text(f'I do not understand the message "{message}"')

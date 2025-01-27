@@ -81,4 +81,6 @@ curl http://{pi_ip}:8000/
 * production logging on the pi including rolling
 * Wiring diagram for pi/relay/garage door.
 * Info about the front end repo
+  * running locally `source venv/bin/activate` and `fastapi dev`
+
 
