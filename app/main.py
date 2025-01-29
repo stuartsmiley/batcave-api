@@ -50,7 +50,7 @@ async def add_secure_headers(request, call_next):
 origins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173'
-    'https://192.168.1.251:443'
+    'https://192.168.1.251'
 ]
 
 app.add_middleware(CORSMiddleware,
@@ -64,7 +64,7 @@ app.include_router(critters.router)
 app.include_router(socket_ops.router)
 
 # manager = ConnectionManager()
-@app.get("/")
+@app.get("/api")
 def read_root():
     return {"hello", "Stu"}
 
@@ -106,6 +106,6 @@ html = """
 </html>
 """
 
-@app.get("/whatever")
+@app.get("/api/whatever")
 async def get_whatever():
     return HTMLResponse(html)

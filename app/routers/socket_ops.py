@@ -5,7 +5,7 @@ from starlette.websockets import WebSocketDisconnect
 router = APIRouter()
 manager = ConnectionManager()
 
-@router.websocket("/ws/{client_id}")
+@router.websocket("/api/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(websocket)
     try:
