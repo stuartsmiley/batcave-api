@@ -102,3 +102,12 @@ curl http://{pi_ip}:8000/api
 ## Installing CADDY on the pi 
 Using CADDY as a reverse proxy for fastAPI on the pi for tls. See CADDY section of front end repo
 `batcave2`.
+
+
+After the upgrade from in-memory data to sqlite for the data, after first starting the server, make sure the 
+db is owned by www-data:batman on the pi
+
+```
+cd /srv/batcave-api
+sudo chown www-data:batman batcave.db
+```
