@@ -9,6 +9,11 @@ Running locally for development/testing
 * Leave rpi-lgpio commented out in requirements.txt when installing dependencies in the virtual
   environment locally, but this will need to be uncommented on the pi
 
+After activating the virtual environment, run the following command to start the FastAPI app:
+```
+fastapi dev app/main.py
+```
+
 In this example, the user on the pi is `batman`. Replace `batman` with whatever user you want to use on the pi.
 Replace {pi_ip} with the IP address of you pi on your local network.
 

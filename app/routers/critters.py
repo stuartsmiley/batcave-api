@@ -1,53 +1,61 @@
 from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel
-from ..dependencies import PermissionsValidator, validate_token
+from sqlmodel import SQLModel, Session, select
 
-class Species(BaseModel):
-    id: int
-    name: str
+from app.db import get_db
+from app.dependencies import PermissionsValidator
+from app.models.critters import Critter
 
-class Critter(BaseModel):
+
+class CritterCreate(SQLModel):
     name: str
     nickname: str
-    species: Species
     is_freak: bool
+    species_id: int
 
-# TODO
-# PUT IN SQLITE or something so that multiple threads
-# can share this same list
-cat = Species(id=9685, name="Felis catus Linnaeus")
-human = Species(id=9606, name="Homo sapiens")
-critter_store = [
-    Critter(name='Bruce Wayne', nickname='BW', is_freak=True, species=cat),
-    Critter(name='Lu-Lu Fishpaw', nickname='LuLu', is_freak=True, species=cat),
-    Critter(name='Stuart Smiley', nickname='Stu', is_freak=False, species=human),
-    Critter(name='Jennifer Lentz', nickname='Doc', is_freak=False, species=human)
-]
+class CritterRead(SQLModel):
+    id: int
+    name: str
+    nickname: str
+    is_freak: bool
+    species_id: int
+
 
 router = APIRouter()
 
-@router.get('/api/critters', dependencies=[Depends(PermissionsValidator(['read:critters']))])
-def read_critters(skip: int = 0, limit: int = 10):
-    return critter_store[skip: skip + limit]
+@router.get('/api/critters', response_model=list[CritterRead],
+            dependencies=[Depends(PermissionsValidator(['read:critters']))])
+def read_critters(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    stmt = select(Critter).offset(skip).limit(limit)
+    return db.exec(stmt).all()
 
-@router.get('/api/critters/{tax_id}', dependencies=[Depends(PermissionsValidator(["read:critters"]))])
-def critters_by_tax_id(tax_id: int):
-    return [critter for critter in critter_store if critter.species.id == tax_id]
+@router.get('/api/critters/{tax_id}', response_model=list[CritterRead],
+            dependencies=[Depends(PermissionsValidator(["read:critters"]))])
+def critters_by_tax_id(tax_id: int, db: Session = Depends(get_db)):
+    stmt = select(Critter).where(Critter.species_id == tax_id)
+    return db.exec(stmt).all()
 
-@router.get('/api/nicknamed/{tax_id}', response_model=list[Critter])
-def critter_by_tax_id_and_nickname(tax_id: int, nickname: str):
-    return [critter for critter in critter_store
-            if critter.species.id == tax_id and critter.nickname == nickname]
 
-@router.post('/api/critter', response_model=Critter, status_code=status.HTTP_201_CREATED,
+@router.get('/api/nicknamed/{tax_id}', response_model=list[CritterRead])
+def critter_by_tax_id_and_nickname(tax_id: int, nickname: str, db: Session = Depends(get_db)):
+    stmt = select(Critter).where((Critter.species_id == tax_id) & (Critter.nickname == nickname))
+    return db.exec(stmt).all()
+
+@router.post('/api/critter', response_model=CritterRead, status_code=status.HTTP_201_CREATED,
              dependencies=[Depends(PermissionsValidator(["write:critters"]))])
-async def add_critter(critter: Critter):
+async def add_critter(critter: CritterCreate, db: Session = Depends(get_db)):
     if critter.nickname == 'dude':
         raise RuntimeError('dude does not abide')
-    for existing in critter_store:
-        if existing.nickname == critter.nickname:
-            raise RequestValidationError(f'{existing.nickname} nickname is already in use.')
-    critter_store.append(critter)
-    return critter
+    exists = db.exec(select(Critter).where(Critter.nickname == critter.nickname)).first()
+    if exists:
+        raise RequestValidationError([{
+        'loc': ['body', 'nickname'],
+        'msg': f'{critter.nickname} nickname is already in use.',
+        'type': 'value_error.duplicate'
+    }])
+    db_obj = Critter(**critter.model_dump())
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
 

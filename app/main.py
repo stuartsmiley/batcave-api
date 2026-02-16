@@ -1,19 +1,19 @@
-from fastapi import FastAPI, Query, Header, status, WebSocket
+from contextlib import asynccontextmanager
+
+import secure
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from sqlmodel import SQLModel, Session, select
 from starlette.middleware.cors import CORSMiddleware
+
+from app.db import engine
+from app.models.critters import Species
+from .config import settings
 from .routers import critters
 from .routers import socket_ops
-import os
-import secure
-from .config import settings
 
-# from dotenv import load_dotenv
-#
-# load_dotenv()
 
-# APP_MODE = os.getenv("APP_MODE")
 print('================================')
-# print(APP_MODE)
 print(settings.app_mode)
 print('================================')
 docs_url = None if settings.app_mode == "production" else "/docs"
@@ -23,21 +23,23 @@ openapi_url = None if settings.app_mode == "production" else "/openapi.json"
 
 app = FastAPI(docs_url=docs_url, redoc_url=redoc_url, openapi_url=openapi_url)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as db:
+        if db.exec(select(Species)).first() is None:
+            db.add_all([
+                Species(id=9685, name="Felis catus Linnaeus"),
+                Species(id=9606, name="Homo sapiens")
+            ])
+            db.commit()
+    yield
+
+
 csp = secure.ContentSecurityPolicy().default_src("'self'").frame_ancestors("'none'")
-# enforces https - should be skipped / handled by reverse proxy if using?
-# hsts = secure.StrictTransportSecurity().max_age(31536000).include_subdomains()
-# we want referrer info
-# referrer = secure.ReferrerPolicy().no_referrer()
 cache_value = secure.CacheControl().no_cache().no_store().max_age(0).must_revalidate()
 x_frame_options = secure.XFrameOptions().deny()
 
-# secure_headers = secure.Secure(
-#     csp=csp,
-#     hsts=hsts,
-#     referrer=referrer,
-#     cache=cache_value,
-#     xfo=x_frame_options,
-# )
 secure_headers = secure.Secure.with_default_headers()
 
 @app.middleware("http")
@@ -60,10 +62,11 @@ app.add_middleware(CORSMiddleware,
                    max_age=86400,
                    )
 
+app.router.lifespan_context = lifespan
 app.include_router(critters.router)
 app.include_router(socket_ops.router)
 
-# manager = ConnectionManager()
+
 @app.get("/api")
 def read_root():
     return {"hello", "Stu"}
